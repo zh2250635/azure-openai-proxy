@@ -70,7 +70,9 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - start;
-    logger.info(`使用 ${req.method} 方法，请求了 ${req.path} 路径，响应状态码为 ${res.statusCode}，消耗了 ${ms} ms`);
+    logger.info(
+      `使用 ${req.method} 方法，请求了 ${req.path} 路径，响应状态码为 ${res.statusCode}，消耗了 ${ms} ms`
+    );
   });
   next();
 });
@@ -233,19 +235,50 @@ async function chatCompletions(req, res, region, deploymentName, channelName) {
 async function streamModifier(resBody, res, model) {
   try {
     let buffer = "";
+    // 'data'事件处理器：当接收到新的数据块时触发
     resBody.on("data", (data) => {
+      // 记录调试信息：表示开始接收数据流
       logger.debug("stream data");
+
+      // 如果data是空的，就直接返回不做处理
       if (!data) return;
+
+      // 将接收到的数据块转换为字符串形式
       let content = data.toString();
-      content += buffer;
-      let lines = content.split("\n");
-      buffer = content.endsWith("\n") ? "" : lines.pop(); // 如果最后一个字符不是换行符，则将其保存到buffer中
+
+      // 将转换后的数据添加到buffer中，用于积累完整的数据
+      buffer += content;
+
+      // 查找buffer中最后一个出现的双换行符的位置，这用于区分完整的消息和不完整的消息
+      let lastNewlineIndex = buffer.lastIndexOf("\n\n");
+
+      // 将buffer中到最后一个双换行符之前的部分（如果有的话）视为完整数据
+      let completeData = buffer.substring(0, lastNewlineIndex);
+
+      // 将最后一个双换行符之后的部分保留为不完整的数据，等待更多的数据到来
+      let incompleteData = buffer.substring(lastNewlineIndex + 2);
+
+      // 更新buffer，只保存不完整的数据部分
+      buffer = incompleteData;
+
+      // 将完整的数据部分按双换行符分割，得到完整的消息行
+      let lines = completeData.split("\n\n");
+
+      // 遍历所有完整的消息行
       lines.forEach((line) => {
+        // 对每一行使用makeLine函数进行处理，可能是格式化、过滤等
         let newLine = makeLine(line, model);
-        res.write(newLine);
+
+        // 如果处理后的行是有效的，则写入响应流
+        if (newLine) {
+          res.write(newLine);
+        }
+
+        // 记录调试信息：输出处理后的新行内容
         logger.debug("newLine:", newLine);
       });
     });
+
     resBody.on("end", () => {
       if (buffer) {
         let newLine = makeLine(buffer, model);
@@ -274,6 +307,15 @@ function makeLine(line, model) {
     try {
       // 获取json数据
       let json = JSON.parse(line.slice(6));
+      //   如果json数据中包含content_filter_results字段，则将该字段删除
+      if (json?.content_filter_results) {
+        delete json.content_filter_results;
+        logger.debug("delete content_filter_results in json");
+      }
+      if (json?.choices?.[0]?.content_filter_results) {
+        delete json.choices[0].content_filter_results;
+        logger.debug("delete content_filter_results in json.choices[0]");
+      }
       json.model = modelMap[model] || model;
       return `data: ${JSON.stringify(json)}\n\n`;
     } catch (error) {
@@ -352,20 +394,20 @@ async function handelFetchError(
 }
 
 async function others(req, res, region, deploymentName, channelName, fetchUrl) {
-    try{
+  try {
     const reqBody = req.body;
     const reqHeaders = req.headers;
     const reqMethod = req.method;
 
     // 检查请求头是否包含Authorization Bearer Token
     if (!reqHeaders.authorization) {
-        return standerdError(
+      return standerdError(
         res,
         401,
         401,
         "unauthorized",
         "You must provide an authorization token"
-        );
+      );
     }
 
     const authToken = reqHeaders.authorization.split(" ")[1];
@@ -377,22 +419,24 @@ async function others(req, res, region, deploymentName, channelName, fetchUrl) {
     logger.debug("Request Headers:", reqHeaders);
 
     let response = await fetch(fetchUrl, {
-        method: reqMethod,
-        headers: reqHeaders,
-        body: typeof reqBody === "object" ? JSON.stringify(reqBody) : null,
+      method: reqMethod,
+      headers: reqHeaders,
+      body: typeof reqBody === "object" ? JSON.stringify(reqBody) : null,
     });
 
     if (response.ok) {
-        let headers = response.headers;
-        headers["Content-Type"] = "application/json";
-        res.writeHead(response.status, headers);
-        res.pipe(response.body);
-        return;
+      let headers = response.headers;
+      headers["Content-Type"] = "application/json";
+      res.writeHead(response.status, headers);
+      res.pipe(response.body);
+      return;
     } else {
-        handelFetchError(res, response, region, deploymentName, channelName);
+      handelFetchError(res, response, region, deploymentName, channelName);
     }
-} catch (error) {
-    logger.error(`在others函数中的请求发出前捕捉到一个错误: ${error}, 传入的数据为：${region}, ${deploymentName}, ${channelName}, ${fetchUrl}`);
+  } catch (error) {
+    logger.error(
+      `在others函数中的请求发出前捕捉到一个错误: ${error}, 传入的数据为：${region}, ${deploymentName}, ${channelName}, ${fetchUrl}`
+    );
     return standerdError(
       res,
       500,

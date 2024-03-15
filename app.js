@@ -381,12 +381,17 @@ async function handelFetchError(
       response.statusText
     }, and response body: '${await response.text()}'`
   );
-  res.writeHead(response.status, response.headers);
+  let headers = response.headers;
+  headers["Content-Type"] = "application/json";
+  res.writeHead(response.status, headers);
   res.write(
     JSON.stringify({
-      error: true,
-      code: response.status,
-      message: "meet an error",
+      error: {
+        message: "meet a error",
+        type: "invalid_request_error",
+        param: null,
+        code: null,
+      },
     })
   );
   res.end();

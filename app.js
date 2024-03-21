@@ -330,7 +330,7 @@ function makeLine(line, model) {
 }
 
 async function imageGenerations(req, res, region, deploymentName, channelName) {
-  const fetchUrl = `https://${region}.api.cognitive.microsoft.com/openai/deployments/${deploymentName}/image/generations?api-version=${apiVersion}`;
+  const fetchUrl = `https://${region}.api.cognitive.microsoft.com/openai/deployments/${deploymentName}/images/generations?api-version=${apiVersion}`;
   others(req, res, region, deploymentName, channelName, fetchUrl);
 }
 
@@ -429,7 +429,10 @@ async function others(req, res, region, deploymentName, channelName, fetchUrl) {
 
     let response = await fetch(fetchUrl, {
       method: reqMethod,
-      headers: reqHeaders,
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": authToken,
+      },
       body: typeof reqBody === "object" ? JSON.stringify(reqBody) : null,
     });
 

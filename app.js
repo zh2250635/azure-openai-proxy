@@ -126,7 +126,7 @@ app.all("*", async (req, res) => {
     case "v1/chat/completions":
       await chatCompletions(req, res, region, deploymentName, channelName);
       break;
-    case "v1/image/generations":
+    case "v1/images/generations":
       await imageGenerations(req, res, region, deploymentName, channelName);
       break;
 

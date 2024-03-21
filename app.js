@@ -215,7 +215,7 @@ async function chatCompletions(req, res, region, deploymentName, channelName) {
       } else {
         const data = await response.json();
         res.writeHead(response.status, response.headers.raw());
-        data.model = model;
+        data.model = modelMap[model] || model;
         res.write(JSON.stringify(data));
         res.end();
       }
@@ -237,6 +237,7 @@ async function chatCompletions(req, res, region, deploymentName, channelName) {
 async function streamModifier(resBody, res, model) {
   try {
     let buffer = "";
+    const streamRes = new StreamResponse(res);
     // 'data'事件处理器：当接收到新的数据块时触发
     resBody.on("data", (data) => {
       // 记录调试信息：表示开始接收数据流
@@ -273,8 +274,7 @@ async function streamModifier(resBody, res, model) {
 
         // 如果处理后的行是有效的，则写入响应流
         if (newLine) {
-          res.write(newLine);
-          await sleep(sleepTime);
+          streamRes.addline(newLine);
         }
 
         // 记录调试信息：输出处理后的新行内容
@@ -285,9 +285,9 @@ async function streamModifier(resBody, res, model) {
     resBody.on("end", () => {
       if (buffer) {
         let newLine = makeLine(buffer, model);
-        res.write(newLine);
+        streamRes.addline(newLine);
       }
-      res.end();
+      streamRes.responseStoped(true);
       logger.debug("stream ended");
     });
   } catch (error) {
@@ -480,3 +480,43 @@ process.on("SIGINT", () => {
   console.log("Process received SIGINT signal");
   process.exit(0);
 });
+
+class StreamResponse {
+  constructor(res) {
+    this.res = res;
+    this.queue = [];
+    this.upperResponseFinished = false;
+
+    this.write();
+  }
+
+  async write() {
+    while (true) {
+      if (this.queue.length === 0) {
+        await sleep(100);
+      } else {
+        let data = this.queue.shift();
+        this.res.write(data);
+        if (data === "data: [DONE]\n\n") {
+          this.end();
+          break;
+        }
+        if (!this.upperResponseFinished) {
+          await sleep(sleepTime);
+        }
+      }
+    }
+  }
+
+  end() {
+    this.res.end();
+  }
+
+  addline(line) {
+    this.queue.push(line);
+  }
+
+  responseStoped(status) {
+    this.upperResponseFinished = status;
+  }
+}

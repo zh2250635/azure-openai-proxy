@@ -214,9 +214,10 @@ async function chatCompletions(req, res, region, deploymentName, channelName) {
         streamModifier(response.body, res, model);
       } else {
         const data = await response.json();
-        res.writeHead(response.status, response.headers.raw());
+        // res.writeHead(response.status, response.headers.raw());
         data.model = modelMap[model] || model;
-        res.write(JSON.stringify(data));
+        res.json(data);
+        logger.debug("response data:", data);
         res.end();
       }
     } else {

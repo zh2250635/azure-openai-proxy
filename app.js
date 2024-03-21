@@ -206,13 +206,14 @@ async function chatCompletions(req, res, region, deploymentName, channelName) {
       if (reqBody?.stream) {
         logger.debug("type of response.body:", typeof response.body);
         logger.debug("response.headers:", response.headers);
-        let resHeaders = response.headers;
+        let resHeaders = response.headers.raw();
+        logger.debug("response.headers.raw():", resHeaders);
         resHeaders["Content-Type"] = "text/event-stream";
         res.writeHead(response.status, resHeaders);
         streamModifier(response.body, res, model);
       } else {
         const data = await response.json();
-        res.writeHead(response.status, response.headers);
+        res.writeHead(response.status, response.headers.raw());
         data.model = model;
         res.write(JSON.stringify(data));
         res.end();
@@ -265,13 +266,14 @@ async function streamModifier(resBody, res, model) {
       let lines = completeData.split("\n\n");
 
       // 遍历所有完整的消息行
-      lines.forEach((line) => {
+      lines.forEach(async (line) => {
         // 对每一行使用makeLine函数进行处理，可能是格式化、过滤等
         let newLine = makeLine(line, model);
 
         // 如果处理后的行是有效的，则写入响应流
         if (newLine) {
           res.write(newLine);
+          await sleep(100);// 等待100ms
         }
 
         // 记录调试信息：输出处理后的新行内容
@@ -381,7 +383,7 @@ async function handelFetchError(
       response.statusText
     }, and response body: '${await response.text()}'`
   );
-  let headers = response.headers;
+  let headers = response.headers.raw();
   headers["Content-Type"] = "application/json";
   res.writeHead(response.status, headers);
   res.write(
@@ -450,6 +452,12 @@ async function others(req, res, region, deploymentName, channelName, fetchUrl) {
       "An error occurred while processing your request"
     );
   }
+}
+
+async function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 app.listen(port, () => {

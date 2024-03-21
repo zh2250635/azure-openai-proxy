@@ -11,6 +11,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const logLevel = process.env.LOG_LEVEL || "info";
 const apiVersion = process.env.API_VERSION || "2021-05-01";
+const sleepTime = process.env.SLEEP_TIME || 100;
 const modelMap = {
   "gpt-3.5-turbo": "gpt-3.5-turbo-0125",
   "gpt-3.5-turbo-16k": "gpt-3.5-turbo-16k-0613",
@@ -273,7 +274,7 @@ async function streamModifier(resBody, res, model) {
         // 如果处理后的行是有效的，则写入响应流
         if (newLine) {
           res.write(newLine);
-          await sleep(100);// 等待100ms
+          await sleep(sleepTime);
         }
 
         // 记录调试信息：输出处理后的新行内容

@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import express from "express";
+import express, { json } from "express";
 import wiston from "winston";
 import { format } from "winston";
 
@@ -133,6 +133,7 @@ app.all("*", async (req, res) => {
     case "v1/embeddings":
     case "v1/engines/text-embedding-ada-002/embeddings":
       await embeddings(req, res, region, deploymentName, channelName);
+      break;
 
     case "v1/whisper/transcribe":
       await whisperTranscribe(req, res, region, deploymentName, channelName);
@@ -404,6 +405,7 @@ async function handelFetchError(
 
 async function others(req, res, region, deploymentName, channelName, fetchUrl) {
   try {
+    // logger.debug("others function", fetchUrl);
     const reqBody = req.body;
     const reqHeaders = req.headers;
     const reqMethod = req.method;
@@ -427,7 +429,7 @@ async function others(req, res, region, deploymentName, channelName, fetchUrl) {
 
     logger.debug("Request Headers:", reqHeaders);
 
-    let response = await fetch(fetchUrl, {
+    const response = await fetch(fetchUrl, {
       method: reqMethod,
       headers: {
         "Content-Type": "application/json",
@@ -439,15 +441,15 @@ async function others(req, res, region, deploymentName, channelName, fetchUrl) {
     if (response.ok) {
       let headers = response.headers;
       headers["Content-Type"] = "application/json";
-      res.writeHead(response.status, headers);
-      res.pipe(response.body);
+      await res.writeHead(response.status, headers);
+      response.body.pipe(res);
       return;
     } else {
       handelFetchError(res, response, region, deploymentName, channelName);
     }
   } catch (error) {
     logger.error(
-      `在others函数中的请求发出前捕捉到一个错误: ${error}, 传入的数据为：${region}, ${deploymentName}, ${channelName}, ${fetchUrl}`
+      `在others函数中的请求发出前捕捉到一个错误: ${error}, 传入的数据为：${region}, ${deploymentName}, ${channelName}, ${fetchUrl}, 错误发生在：${error.stack}`
     );
     return standerdError(
       res,

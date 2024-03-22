@@ -211,8 +211,13 @@ async function chatCompletions(req, res, region, deploymentName, channelName) {
         let resHeaders = response.headers.raw();
         logger.debug("response.headers.raw():", resHeaders);
         resHeaders["Content-Type"] = "text/event-stream";
-        res.writeHead(response.status, resHeaders);
-        streamModifier(response.body, res, model);
+        if (!process.env.NOT_MODIFY_STREAM) {
+          res.writeHead(response.status, resHeaders);
+          streamModifier(response.body, res, model);
+        }else{
+          res.writeHead(response.status, resHeaders);
+          response.body.pipe(res);
+        }
       } else {
         const data = await response.json();
         // res.writeHead(response.status, response.headers.raw());

@@ -317,14 +317,20 @@ function makeLine(line, model) {
     try {
       // 获取json数据
       let json = JSON.parse(line.slice(6));
+
+      // 去除choices长度为0的情况
+      if (json.choices.length === 0) {
+        return "";
+      }
+
       //   如果json数据中包含content_filter_results字段，则将该字段删除
       if (json?.content_filter_results) {
         delete json.content_filter_results;
         logger.debug("delete content_filter_results in json");
       }
-      if (json?.choices?.[0]?.content_filter_results) {
-        delete json.choices[0].content_filter_results;
-        logger.debug("delete content_filter_results in json.choices[0]");
+      if (json?.choices?.[0]?.content_filter_result) {
+        delete json.choices[0].content_filter_result;
+        logger.debug("delete content_filter_result in json.choices[0]");
       }
       json.model = modelMap[model] || model;
       return `data: ${JSON.stringify(json)}\n\n`;
